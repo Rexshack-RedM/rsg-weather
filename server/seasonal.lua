@@ -2,8 +2,25 @@
 local API = RSGWeather
 local cfg = Config.Seasonal
 
-local mode = GetResourceKvpString('season_mode') or 'auto' -- 'auto' | 'off' | '<eventName>' (forced by admin, survives restarts)
-if mode ~= 'auto' and mode ~= 'off' and not Config.Seasonal.Events[mode] then mode = 'auto' end
+-- 'auto' | 'off' | '<eventName>' (forced by admin, survives restarts)
+-- Stored in MySQL (oxmysql) instead of resource KVP, so no server "db" folder is created
+local mode = 'auto'
+local modeLoaded = false
+
+MySQL.ready(function()
+    MySQL.query.await('CREATE TABLE IF NOT EXISTS rsg_weather_state (`key` VARCHAR(50) NOT NULL PRIMARY KEY, value VARCHAR(100) NOT NULL)')
+    local saved = MySQL.scalar.await('SELECT value FROM rsg_weather_state WHERE `key` = ?', { 'season_mode' })
+    if not saved then
+        -- one-time migration from the old KVP value (only read if a db folder already exists)
+        saved = GetResourceKvpString('season_mode')
+        if saved then
+            MySQL.prepare.await('INSERT INTO rsg_weather_state (`key`, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)', { 'season_mode', saved })
+            DeleteResourceKvp('season_mode')
+        end
+    end
+    if saved and (saved == 'auto' or saved == 'off' or Config.Seasonal.Events[saved]) then mode = saved end
+    modeLoaded = true
+end)
 local current = nil     -- name of the event currently applied
 
 local function dayNumber(month, day) return month * 100 + day end
@@ -70,7 +87,7 @@ end
 local function setSeasonMode(m)
     if m ~= 'auto' and m ~= 'off' and not cfg.Events[m] then return false end
     mode = m
-    SetResourceKvp('season_mode', m)
+    MySQL.prepare('INSERT INTO rsg_weather_state (`key`, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)', { 'season_mode', m })
     evaluate()
     return true
 end
@@ -105,6 +122,7 @@ CreateThread(function()
         end
     end
     Wait(1500) -- let patterns.lua load first
+    while not modeLoaded do Wait(100) end -- wait for the saved season mode from MySQL
     publish()
     while true do
         evaluate()

@@ -3,7 +3,7 @@ rdr3_warning 'I acknowledge that this is a prerelease build of RedM, and I am aw
 game 'rdr3'
 
 description 'rsg-weather - time, weather and wind sync for RSG Framework (weathersync compatible)'
-version '3.0.0'
+version '3.0.1'
 
 -- Backward compatibility: any resource calling exports.weathersync:xxx()
 -- or exports['weathersync']:xxx() is routed to this resource.
@@ -17,6 +17,7 @@ shared_scripts {
 }
 
 server_scripts {
+    '@oxmysql/lib/MySQL.lua',
     'server/sv_webhooks_config.lua',
     'server/webhooks.lua',
     'server/server.lua',
@@ -37,6 +38,7 @@ client_scripts {
 dependencies {
     'rsg-core',
     'ox_lib',
+    'oxmysql',
 }
 
 ui_page 'html/index.html'
