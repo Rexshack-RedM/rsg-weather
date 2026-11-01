@@ -1,5 +1,3 @@
-lib.locale() -- loads locales/<ox:locale>.json once for client and server
-
 -- Shared helpers (kept global with the same names as weathersync for compatibility)
 
 WeatherTypes = {
@@ -21,7 +19,7 @@ function DHMSToTime(day, hour, minute, second)
     return (day or 0) * 86400 + (hour or 0) * 3600 + (minute or 0) * 60 + (second or 0)
 end
 
--- translate a locale key, falling back to `fallback` when ox_lib has no entry for it
+-- translate a locale key, falling back to `fallback` when the locale has no entry for it
 function L(key, fallback, ...)
     if type(locale) == 'function' then
         local ok, v = pcall(locale, key, ...)
@@ -55,6 +53,8 @@ function SeasonLabel(name)
     local ev = Config and Config.Seasonal and Config.Seasonal.Events[name]
     return L('season_' .. name, ev and ev.label or name)
 end
+
+function Clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
 
 -- tonumber that rejects NaN / inf (msgpack from clients can carry them and they would poison the state)
 function ToNum(v, default)

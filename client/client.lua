@@ -1,3 +1,4 @@
+local RSGCore = exports['rsg-core']:GetCoreObject()
 
 ---------------------------------
 -- local state
@@ -78,7 +79,7 @@ local function syncWeather(force)
     local data = GlobalState.rsgWeather
     if not data then return end
 
-    local coords = GetEntityCoords(cache.ped)
+    local coords = GetEntityCoords(PlayerPedId())
     local translated = translateWeather(data.weather, coords)
     local transition = data.transition or 10.0
 
@@ -117,7 +118,7 @@ AddStateBagChangeHandler('rsgTime', 'global', function() SetTimeout(0, syncTime)
 local function syncWind()
     local data = GlobalState.rsgWind
     if not data then return end
-    local ped = cache.ped
+    local ped = PlayerPedId()
     local seaAlt = GetEntityCoords(ped).z - Config.MeanSeaLevel
     local groundAlt = GetEntityHeightAboveGround(ped)
     local dir = (data.direction + math.floor(seaAlt / Config.WindShearInterval) * Config.WindShearDirection) % 360
@@ -152,7 +153,7 @@ local function toggleSync(notify)
         syncTime(); syncWeather(true)
     end
     if notify == true then
-        lib.notify({ title = locale('title'), description = syncEnabled and locale('sync_on') or locale('sync_off'), type = 'inform' })
+        RSGCore.Functions.Notify({ title = locale('title'), description = syncEnabled and locale('sync_on') or locale('sync_off'), type = 'inform', duration = 5000 })
     end
 end
 
@@ -172,7 +173,7 @@ end
 
 local function setMyTime(h, m, s, transition)
     if syncEnabled then toggleSync() end
-    local function int(v, max) return lib.math.clamp(math.floor(ToNum(v, 0)), 0, max) end
+    local function int(v, max) return Clamp(math.floor(ToNum(v, 0)), 0, max) end
     applyTime(int(h, 23), int(m, 59), int(s, 59), int(transition, 600000))
 end
 

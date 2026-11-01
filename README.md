@@ -1,6 +1,6 @@
 # rsg-weather
 
-Time, weather and wind sync for **RSG Framework** (RedM), built on **ox_lib**.
+Time, weather and wind sync for **RSG Framework** (RedM), with no ox_lib dependency (locales, notify, callbacks and commands all use rsg-core).
 A drop-in replacement for `weathersync` — every old export and event keeps working.
 
 ## Features
@@ -15,22 +15,20 @@ A drop-in replacement for `weathersync` — every old export and event keeps wor
 
 ## Requirements
 - [rsg-core](https://github.com/Rexshack-RedM/rsg-core)
-- [ox_lib](https://github.com/Rexshack-RedM/ox_lib)
 - [oxmysql](https://github.com/overextended/oxmysql) (stores the season mode in a small `rsg_weather_state` table, created automatically, no SQL to import)
 
 ## Installation
 1. **Stop and remove the old `weathersync` resource** (this resource `provide`s that name).
 2. Put `rsg-weather` in your resources folder.
-3. Add to `server.cfg` (after ox_lib and rsg-core):
+3. Add to `server.cfg` (after oxmysql and rsg-core):
    ```
-   ensure ox_lib
    ensure oxmysql
    ensure rsg-core
    ensure rsg-weather
    ```
 4. Optional — language and Discord (see below):
    ```
-   setr ox:locale "en"
+   setr rsg:locale "en"
    set rsg_weather_webhook "https://discord.com/api/webhooks/..."
    ```
 After changing `fxmanifest.lua` always run `refresh` before `ensure rsg-weather`.
@@ -112,7 +110,7 @@ Use `set`, **not** `setr` (`setr` sends the value to every player).
 - The footer uses `sv_projectName` unless `ServerName` is set.
 
 ## Languages
-Set with `setr ox:locale "<code>"`: `en`, `de`, `el`, `es`, `fr`, `ja`, `nl`, `pl`, `pt-br`, `ro`.
+Set with `setr rsg:locale "<code>"` (falls back to `ox:locale`): `en`, `de`, `el`, `es`, `fr`, `ja`, `nl`, `pl`, `pt-br`, `ro`.
 Everything is translated: notifications, command help, admin panel, forecast, weather/day/compass names, pattern errors and Discord logs. Missing keys fall back to English.
 To add a language, copy `locales/en.json` to `locales/<code>.json` and translate the values, keeping `%s` / `%d` placeholders in the same order.
 

@@ -71,7 +71,7 @@ RegisterNetEvent('rsg-weather:client:bloodmoonDebug', function()
         tostring(RSGWeatherClient.isSyncEnabled()), WeatherLabel(w),
         tostring(n and n.variations and w and n.variations[w] or locale('bloodmoon_no_variation')))
     print('[rsg-weather] blood moon: ' .. info)
-    lib.notify({ title = locale('bloodmoon_title'), description = locale(testMode and 'bloodmoon_test_on' or 'bloodmoon_test_off') .. ' - ' .. info, type = 'inform', duration = 10000 })
+    exports['rsg-core']:Notify({ title = locale('bloodmoon_title'), description = locale(testMode and 'bloodmoon_test_on' or 'bloodmoon_test_off') .. ' - ' .. info, type = 'inform', duration = 10000 })
     setBlood(n ~= nil and n.variations ~= nil and (testMode or isNight(n)))
 end)
 

@@ -1,4 +1,5 @@
 -- Named weather patterns built by admins in the NUI, persisted to patterns.json
+local RSGCore = exports['rsg-core']:GetCoreObject()
 local API = RSGWeather
 local FILE = 'patterns.json'
 local Store = { active = 'default', patterns = {} }
@@ -58,17 +59,17 @@ local function listForClient()
     return { active = Store.active, patterns = Store.patterns, default = Config.WeatherPattern }
 end
 
-lib.callback.register('rsg-weather:server:getPatterns', function(src)
-    if not RSGWeatherIsAdmin(src) then RSGWeatherDeny(src, L('wh_what_pattern_list', 'pattern list')); return nil end
-    return listForClient()
+RSGCore.Functions.CreateCallback('rsg-weather:server:getPatterns', function(src, cb)
+    if not RSGWeatherIsAdmin(src) then RSGWeatherDeny(src, L('wh_what_pattern_list', 'pattern list')); return cb(nil) end
+    return cb(listForClient())
 end)
 
-lib.callback.register('rsg-weather:server:savePattern', function(src, name, pattern, apply)
-    if not RSGWeatherIsAdmin(src) then RSGWeatherDeny(src, L('wh_what_save_pattern', 'save pattern')); return false, L('no_permission', 'No permission') end
+RSGCore.Functions.CreateCallback('rsg-weather:server:savePattern', function(src, cb, name, pattern, apply)
+    if not RSGWeatherIsAdmin(src) then RSGWeatherDeny(src, L('wh_what_save_pattern', 'save pattern')); return cb(false, L('no_permission', 'No permission')) end
     name = sanitizeName(name)
-    if not name then return false, L('err_invalid_name', 'Invalid name (letters, numbers, spaces, - and _ only; not "default")') end
+    if not name then return cb(false, L('err_invalid_name', 'Invalid name (letters, numbers, spaces, - and _ only; not "default")')) end
     local clean, err = validate(pattern)
-    if not clean then return false, err end
+    if not clean then return cb(false, err) end
     Store.patterns[name] = clean
     if apply or Store.active == name then Store.active = name; applyActive() end
     save()
@@ -82,26 +83,26 @@ lib.callback.register('rsg-weather:server:savePattern', function(src, name, patt
     table.sort(lines)
     RSGWeatherLog('patterns', apply and L('wh_pattern_saved_applied', '💾 Pattern saved & applied') or L('wh_pattern_saved', '💾 Pattern saved'), table.concat(lines, '\n'),
         { { name = L('wh_name', 'Name'), value = name }, { name = L('wh_active', 'Active'), value = Store.active } }, src)
-    return true, listForClient()
+    return cb(true, listForClient())
 end)
 
-lib.callback.register('rsg-weather:server:deletePattern', function(src, name)
-    if not RSGWeatherIsAdmin(src) then RSGWeatherDeny(src, L('wh_what_delete_pattern', 'delete pattern')); return false end
-    if not Store.patterns[name] then return false end
+RSGCore.Functions.CreateCallback('rsg-weather:server:deletePattern', function(src, cb, name)
+    if not RSGWeatherIsAdmin(src) then RSGWeatherDeny(src, L('wh_what_delete_pattern', 'delete pattern')); return cb(false) end
+    if type(name) ~= 'string' or not Store.patterns[name] then return cb(false) end
     Store.patterns[name] = nil
     RSGWeatherLog('patterns', L('wh_pattern_deleted', '🗑️ Pattern deleted'), nil, { { name = L('wh_name', 'Name'), value = name } }, src)
     if Store.active == name then Store.active = 'default'; applyActive() end
     save()
-    return true, listForClient()
+    return cb(true, listForClient())
 end)
 
-lib.callback.register('rsg-weather:server:applyPattern', function(src, name)
-    if not RSGWeatherIsAdmin(src) then RSGWeatherDeny(src, L('wh_what_apply_pattern', 'apply pattern')); return false end
-    if name ~= 'default' and not Store.patterns[name] then return false end
+RSGCore.Functions.CreateCallback('rsg-weather:server:applyPattern', function(src, cb, name)
+    if not RSGWeatherIsAdmin(src) then RSGWeatherDeny(src, L('wh_what_apply_pattern', 'apply pattern')); return cb(false) end
+    if type(name) ~= 'string' or (name ~= 'default' and not Store.patterns[name]) then return cb(false) end
     Store.active = name
     RSGWeatherLog('patterns', L('wh_pattern_applied', '✅ Pattern applied'), nil, { { name = L('wh_name', 'Name'), value = name } }, src)
     applyActive(); save()
-    return true, listForClient()
+    return cb(true, listForClient())
 end)
 
 AddEventHandler('rsg-weather:server:restorePattern', function()

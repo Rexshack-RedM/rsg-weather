@@ -130,7 +130,7 @@ function API.setWeather(weather, transition, freeze, permanentSnow)
     State.permanentSnow = permanentSnow and true or false
     weatherTicks = 0
     generateForecast()
-    pushWeather(lib.math.clamp(ToNum(transition, 10.0), 0.1, 300.0))
+    pushWeather(Clamp(ToNum(transition, 10.0), 0.1, 300.0))
     TriggerEvent('rsg-weather:server:weatherChanged', State.weather)
     return true
 end
@@ -161,7 +161,7 @@ function API.getTime()
 end
 
 function API.setTime(d, h, m, s, transition, freeze)
-    local function int(v, max) return lib.math.clamp(math.floor(ToNum(v, 0)), 0, max) end
+    local function int(v, max) return Clamp(math.floor(ToNum(v, 0)), 0, max) end
     State.time       = DHMSToTime(int(d, 1e6) % 7, int(h, 23), int(m, 59), int(s, 59))
     State.timeFrozen = freeze and true or false
     pushTime(int(transition, 600000))
@@ -176,7 +176,7 @@ end
 function API.getTimescale() return State.timescale end
 
 function API.setTimescale(scale)
-    State.timescale = lib.math.clamp(ToNum(scale, Config.Timescale), 0, 1000) + 0.0
+    State.timescale = Clamp(ToNum(scale, Config.Timescale), 0, 1000) + 0.0
     pushTime(0)
 end
 
@@ -186,7 +186,7 @@ function API.getWind() return { direction = State.windDirection, speed = State.w
 
 function API.setWind(direction, speed, frozen)
     State.windDirection = (ToNum(direction, 0.0) % 360) + 0.0
-    State.windSpeed     = lib.math.clamp(ToNum(speed, 0.0), 0, 50) + 0.0
+    State.windSpeed     = Clamp(ToNum(speed, 0.0), 0, 50) + 0.0
     State.windFrozen    = frozen and true or false
     generateForecast()
     pushWind()
@@ -203,7 +203,7 @@ end
 function API.getSyncDelay() return State.syncDelay end
 
 function API.setSyncDelay(delay)
-    State.syncDelay = lib.math.clamp(math.floor(ToNum(delay, Config.SyncDelay)), 500, 60000)
+    State.syncDelay = Clamp(math.floor(ToNum(delay, Config.SyncDelay)), 500, 60000)
 end
 
 function API.resetSyncDelay() State.syncDelay = Config.SyncDelay end
@@ -287,9 +287,9 @@ end
 local lastDeny = {}
 AddEventHandler('playerDropped', function() lastForecast[source] = nil; lastDeny[source] = nil end)
 
-lib.callback.register('rsg-weather:server:getForecast', function(src)
-    if not RSGWeatherForecastAllowed(src) then return nil end
-    return API.getForecast()
+RSGCore.Functions.CreateCallback('rsg-weather:server:getForecast', function(src, cb)
+    if not RSGWeatherForecastAllowed(src) then return cb(nil) end
+    return cb(API.getForecast())
 end)
 
 local function deny(src, what)
@@ -300,11 +300,11 @@ local function deny(src, what)
 end
 RSGWeatherDeny = deny
 
-lib.callback.register('rsg-weather:server:getAdminState', function(src)
-    if not RSGWeatherIsAdmin(src) then deny(src, L('wh_what_panel', 'weather admin panel')); return nil end
+RSGCore.Functions.CreateCallback('rsg-weather:server:getAdminState', function(src, cb)
+    if not RSGWeatherIsAdmin(src) then deny(src, L('wh_what_panel', 'weather admin panel')); return cb(nil) end
     local s = API.getState()
     s.season = RSGWeatherSeason and RSGWeatherSeason.get() or nil
-    return s
+    return cb(s)
 end)
 
 local function logAction(src, action, data)
@@ -329,31 +329,24 @@ local function logAction(src, action, data)
 end
 RSGWeatherLogAction = logAction
 
-lib.callback.register('rsg-weather:server:adminAction', function(src, action, data)
-    if not RSGWeatherIsAdmin(src) then deny(src, L('wh_what_action', 'weather admin action: %s', tostring(action))); return false end
+-- each handler returns true when something changed
+local ADMIN_ACTIONS = {
+    weather   = function(d) return API.setWeather(d.weather, d.transition, d.freeze, d.permanentSnow) end,
+    time      = function(d) API.setTime(d.day, d.hour, d.minute, d.second, d.transition, d.freeze); return true end,
+    timescale = function(d) API.setTimescale(d.timescale); return true end,
+    wind      = function(d) API.setWind(d.direction, d.speed, d.freeze); return true end,
+    syncdelay = function(d) API.setSyncDelay(d.delay); return true end,
+    season    = function(d) return type(d.mode) == 'string' and RSGWeatherSeason ~= nil and RSGWeatherSeason.setMode(d.mode) end,
+    reset     = function() API.resetAll(); return true end,
+}
+
+RSGCore.Functions.CreateCallback('rsg-weather:server:adminAction', function(src, cb, action, data)
+    if not RSGWeatherIsAdmin(src) then deny(src, L('wh_what_action', 'weather admin action: %s', tostring(action))); return cb(false) end
     if type(data) ~= 'table' then data = {} end
-    local ok = (function()
-    if action == 'weather' then
-        return API.setWeather(data.weather, data.transition, data.freeze, data.permanentSnow)
-    elseif action == 'time' then
-        API.setTime(data.day, data.hour, data.minute, data.second, data.transition, data.freeze)
-    elseif action == 'timescale' then
-        API.setTimescale(data.timescale)
-    elseif action == 'wind' then
-        API.setWind(data.direction, data.speed, data.freeze)
-    elseif action == 'syncdelay' then
-        API.setSyncDelay(data.delay)
-    elseif action == 'season' then
-        return RSGWeatherSeason and RSGWeatherSeason.setMode(data.mode) or false
-    elseif action == 'reset' then
-        API.resetAll()
-    else
-        return false
-    end
-    return true
-    end)()
+    local handler = type(action) == 'string' and ADMIN_ACTIONS[action]
+    local ok = handler and handler(data) or false
     if ok then logAction(src, action, data) end
-    return ok
+    return cb(ok)
 end)
 
 ---------------------------------

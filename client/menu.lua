@@ -1,3 +1,5 @@
+local RSGCore = exports['rsg-core']:GetCoreObject()
+local function await(name, ...) return RSGCore.Functions.AwaitCallback(name, 10000, ...) end
 
 -- every locale key starting with ui_ is sent to the NUI (elements use data-l="key")
 local uiLocaleCache
@@ -5,7 +7,7 @@ function UiLocale()
     if uiLocaleCache then return uiLocaleCache end
     local res = GetCurrentResourceName()
     local en = json.decode(LoadResourceFile(res, 'locales/en.json') or '{}') or {}
-    local lang = json.decode(LoadResourceFile(res, ('locales/%s.json'):format(GetConvar('ox:locale', 'en'))) or '{}') or {}
+    local lang = json.decode(LoadResourceFile(res, ('locales/%s.json'):format((function() local l = GetConvar('rsg:locale', ''); return l ~= '' and l or GetConvar('ox:locale', 'en') end)())) or '{}') or {}
     uiLocaleCache = {}
     -- ui_*, weather_*, season_* keys go to the NUI; selected language overrides English
     for _, src in ipairs({ en, lang }) do
@@ -28,9 +30,9 @@ end
 local forecastOpen = false
 
 local function buildForecast()
-    local forecast = lib.callback.await('rsg-weather:server:getForecast', false)
+    local forecast = await('rsg-weather:server:getForecast')
     if not forecast or not forecast[1] then return nil end
-    local coords = GetEntityCoords(cache.ped)
+    local coords = GetEntityCoords(PlayerPedId())
 
     local temp = GetTemperatureAtCoords(coords.x, coords.y, coords.z)
     local tempStr = ShouldUseMetricTemperature() and ('%d°C'):format(math.floor(temp)) or ('%d°F'):format(math.floor(temp * 9 / 5 + 32))
@@ -107,14 +109,14 @@ local function closeUi()
 end
 
 local function pushState()
-    local s = lib.callback.await('rsg-weather:server:getAdminState', false)
+    local s = await('rsg-weather:server:getAdminState')
     if s then SendNUIMessage({ action = 'state', state = s }) end
 end
 
 RegisterNetEvent('rsg-weather:client:openAdminMenu', function()
-    local s = lib.callback.await('rsg-weather:server:getAdminState', false)
-    if not s then return lib.notify({ title = locale('title'), description = locale('no_permission'), type = 'error' }) end
-    local p = lib.callback.await('rsg-weather:server:getPatterns', false)
+    local s = await('rsg-weather:server:getAdminState')
+    if not s then return RSGCore.Functions.Notify({ title = locale('title'), description = locale('no_permission'), type = 'error', duration = 5000 }) end
+    local p = await('rsg-weather:server:getPatterns')
     uiOpen = true
     SetNuiFocus(true, true)
     SendNUIMessage({ action = 'open', state = s, patterns = p, weatherTypes = WeatherTypes, locale = UiLocale() })
@@ -126,23 +128,23 @@ end)
 RegisterNUICallback('close', function(_, cb) closeUi(); cb({}) end)
 
 RegisterNUICallback('action', function(data, cb)
-    local ok = lib.callback.await('rsg-weather:server:adminAction', false, data.name, data.data)
+    local ok = await('rsg-weather:server:adminAction', data.name, data.data)
     pushState()
     cb({ ok = ok })
 end)
 
 RegisterNUICallback('savePattern', function(data, cb)
-    local ok, res = lib.callback.await('rsg-weather:server:savePattern', false, data.name, data.pattern, data.apply)
+    local ok, res = await('rsg-weather:server:savePattern', data.name, data.pattern, data.apply)
     if ok then cb({ ok = true, patterns = res }) else cb({ ok = false, error = res }) end
 end)
 
 RegisterNUICallback('deletePattern', function(data, cb)
-    local ok, res = lib.callback.await('rsg-weather:server:deletePattern', false, data.name)
+    local ok, res = await('rsg-weather:server:deletePattern', data.name)
     cb({ ok = ok, patterns = res })
 end)
 
 RegisterNUICallback('applyPattern', function(data, cb)
-    local ok, res = lib.callback.await('rsg-weather:server:applyPattern', false, data.name)
+    local ok, res = await('rsg-weather:server:applyPattern', data.name)
     cb({ ok = ok, patterns = res })
 end)
 
